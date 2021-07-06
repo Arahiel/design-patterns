@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Strategy", "Strategy\Strate
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TemplateMethod", "TemplateMethod\TemplateMethod.csproj", "{C469A019-1CBA-45AE-823F-3AC464AF6D21}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Visitor", "Visitor\Visitor.csproj", "{8B017ABC-EBA3-4D69-ABA2-FCDED8F49B1C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -141,6 +143,10 @@ Global
 		{C469A019-1CBA-45AE-823F-3AC464AF6D21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C469A019-1CBA-45AE-823F-3AC464AF6D21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C469A019-1CBA-45AE-823F-3AC464AF6D21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B017ABC-EBA3-4D69-ABA2-FCDED8F49B1C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B017ABC-EBA3-4D69-ABA2-FCDED8F49B1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B017ABC-EBA3-4D69-ABA2-FCDED8F49B1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B017ABC-EBA3-4D69-ABA2-FCDED8F49B1C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
