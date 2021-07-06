@@ -1,0 +1,413 @@
+SOLID:
+1. Single responsibility - klasa musi zajmować się jedną funkcjonalnością i niczym poza zakres (uwaga na zależności - gdyż może one powinny być w klasie wyżej obsługującej tę pojedynczą klasę i spajającą cały system/proces)
+2. Open-Closed - Otwarty na rozszerzenia, zamknięty na modyfikacje. Znaczy tyle, że raz stworzonej funkcji nie powinniśmy modyfikować, a napisać ją tak, żeby zależnie od 	czegoś (parametru?) robiła dodatkowe rzeczy. Gdy nadejdzie funkcjonalność do obsłużenia zmienimy tylko parametr/jakąś zmienną od której zależy sposób działania tej funkcji. Stostuje się tu dziedziczenie oraz interfejsy.
+3. Liskov Substitution - Rzutowanie podklasy na klasę bazową powinno być zawsze możliwe oraz obiekty tak rzutowane powinny działać poprawnie. Uwaga na Override metod!
+4. Interface Segregation - interfejsy powinny zawierać tylko tyle metod ile powinny, nic poza zakres. YAGNI - You Ain't Going to Need It.
+5. Dependency Inversion - Klasy wysokiej abstrakcji nie powinny zależeć od elementów (np. zmiennych). Klasy niskie nie powinny upubliczniać swoich zmiennych, gdyż mogą one być zmienione i wtedy klasa wysoka nie będzie już działała poprawnie - gdyż zmieniła się np. struktura tej niskiej zmiennej. Powinno się natomiast dodać interfejs do klasy niskiej oraz zaimplementować tę funkcjonalność udostępniania. Wtedy klasa wysoka będzie mogła odczytać te niskie zmienne nie wiedziąc nic o implementacji.
+
+Design patterns:
+	Builder:
+		Polega na sukcesywnym dodawaniu czegoś do obiektu za pomocą istniejących dla buildera metod. Metody powinny zwracać ten sam typ co klasa, w której się znajdują (return this). Problem pojawia się gdy ta klasa (builder) dziedziczy po jakiejś innej i nadal zwraca siebie! Powoduje to, że gdy użyjemy podklasy, wszystko jest dobrze, gdyż podklasa widzi metody klasy bazowej, ale gdy użyjemy metody klasy bazowej - zwróci ona typ bazowej, ktory nie wie nic o metodach podklas, które po niej dziedziczą. To spowoduje, że już nie możemy użyć metod podklas.
+		
+		Rozwiązaniem jest rekursywne dziedziczenie (recursive generics). Wygląda to jak: 
+		Główny builder:
+			Builder : PersonJobBuilder<Builder>		W tym przypadku PersonJobBuilder jest najniższą klasą w drzewie dziedziczenia (ostatnie dziecko)
+			
+		Najwyższa klasa:
+			public abstract class PersonBuilder
+			  
+		Pośrednia klasa:
+			public class PersonInfoBuilder<SELF> : PersonBuilder
+				where SELF : PersonInfoBuilder<SELF>
+
+		Najniższa klasa;
+			public class PersonJobBuilder<SELF> : PersonInfoBuilder<PersonJobBuilder<SELF>>
+				where SELF : PersonJobBuilder<SELF>
+				
+	Factory:
+	Polega na wydzieleniu osobnej klasy (factory), która może być klasą zewnętrzną lub wewnętrzną (w tym przypadku ma dostęp do prywatnego konstruktora). Posiada ona metody zwracające obiekt o określonym typie, tyle, że inicjalizowany w inny sposób w innych metodach. Klasy o wzorcu Factory zwracają w przeciwieństwie do Buildera całe obiekty (non-piecewise building). Typy zwracane przez fabrykę powinny mieć prywatne lub co najmniej wewnętrzne(internal) konstruktory, aby nie tworzyć tych obiektów przy ich pomocy, a użyc fabryki dedykowanej w tym właśnie celu. Fabryka może być statyczna lub nie. Może być też częścią klasy/typu który zwraca/buduje (Inner factory - umożliwia przerobienie konstruktora na prywatny).
+	Przykład:
+	
+	public class Coordinates
+	{
+		public int x,y;
+		
+		internal Coordinates(int x, int y)
+		{
+			this.x = x;
+			this.y = y;
+		}
+	}
+	
+	public static class CoordinatesFactory
+	{
+		public static Coordinates NewCoordinatesFromCartesian(int x, int y)
+		{
+			return new Coordinates(x,y)
+		}
+		
+		public static Coordinates NewCoordinatesFromAngle(int rho, int theta)
+		{
+			return new Coordinates(rho * Math.Cos(theta), rho * Math.Sin(theta));
+		}
+	}
+	
+	Prototype:
+	Prototypem jest obiekt klasy zainicjalizowany częsciowo lub w całości, który następnie kopiujemy przy pomocy opisanych niżej mechanik. Używanie interfejsu w C# ICloneable jest złym pomysłem (przestarzałe). Jest możliwość stworzenia kopiującego konstruktora, ale wtedy trzeba go zaimplementować również do każdego pola referencyjnego w kopiowanej klasie. Takie podejście pochodzi z C++ i w C# może nie być rozpoznane lub popularne. Można zaimplementować samemu interfejs zawierający metodę DeepCopy (potrzebną do klonowania prototypu - shallow  copy nie zadziała dobrze przez pola referencyjne), aleznowu będziemy musieli nadać ten interfejs każdego wewnętrznemu polu referencyjnemu. Ostatnim sposobem jest serializacja obiektów oraz ich deserializacja (co powoduje powstanie nowego obiektu). Dzięki temu nie musimy pilnować żadnych wewnętrznych pól referencyjnych, gdyż serializacja przechodzi rekursywnie po wszystkich elementach obiektu. Można tutaj zastosować wiele tzw. Formatter'ów/Serializerów do serializacji, ale każdy ma pewne ograniczenia, np. BinaryFormatter wymaga atrybutu [Serializable] na serializowanej klasie i wszystkich wewnętrznych polach referencyjnych (znowu wszystko trzeba uzupełnić). Mamy też XmlSerializer, który wymaga tego, żeby każde wewnętrzne pole referencyjne łącznie z tą klasą miało konstruktor bezparametrowy.
+	
+	Przykład:
+	
+	public static class Extensions
+	{
+		public static T DeepCopyXml<T>(this T self)
+		{
+			using (MemoryStream ms = new MemoryStream())
+			{
+				var s = new XmlSerializer(typeof(T));
+				s.Serialize(ms, self);
+				ms.Position = 0;
+				return (T) s.Deserialize(ms);
+			}
+		}
+	}
+	
+	public class Address
+	{
+		public string StreetName;
+		public string LocalNumber;
+		
+		public Address()
+		{
+		}
+	}
+	
+	public class Person//Klasa do klonowania
+	{
+		public string Name;
+		public Address Address;
+		
+		public Person()
+		{
+		}
+	}
+	
+	Singleton:
+	Jest to wzorzec projektowy, wg. którego tworzymy tylko jedną instancję danej klasy w obrębie całej aplikacji (ponieważ tworzenie wielu instancji byłoby czasochłonne,  zbędne i zajmowałoby niepotrzebnie więcej pamięci). Jest wiele sposobów na uzyskanie tego:
+		-Klasa statyczna - istnieje wtedy tylko jedna instancja, ale nie jest thread-safe.
+		-Klasa niestatyczna z konstruktorem prywatnym i statycznym polem np. Instance, które zwraca obiekt tej klasy. Dodaje się tu tzw. "Lazy<T>" w którym podaje się jako parametr funkcję, która zwraca obiekt tej klasy, co powoduje, że te pole jest inicjalizowane tylko raz, a każde kolejne użycie zwraca obiekt stworzony wcześniej, zamiast tworzyć kolejny.
+		-Klasa niestatyczna z konstruktorem prywatnym i statycznym polem NA KAŻDY WĄTEK - struktura taka jak w poprzednim punkcie, ale zamiast Lazy<T> używamy [ThreadStatic] albo ThreadLocal<T>, które ma taki sam parametr co Lazy<T>.
+		-Mono-State czyli klasa niestatyczna z publicznym konstruktorem, ale ze statycznymi polami. Powoduje to, że możemy stworzyć wiele odrębnych obiektów tej klasy, ale zmieniając wartości pól jednego obiektu zmieniamy wartość wszystkich.
+		-Ostatnim i najlepszym rozwiązaniem jest stworzenie zwykłej klasy bez pól statycznych, ale traktowanie jej jak Singletona. Można również w konstruktorze podawać tutaj jako parametr pewną abstrakcję/interfejs obiektu, który pochłania dużo zasobów, i który będziemy obsługiwali. Dzięki temu możemy podać tu zamock'owany obiekt jak i zwykły w procesie produkcyjnym. Można wtedy łatwo to przetestować przekazując tutaj fałszywy obiekt (mock/stub). Do tego celu można wykorzystać kontenery, i w nich wymuszać działanie jako Singleton danej klasy. Służy do tego np. Autofac.
+		
+	Adapter:
+	Jest to prosty w implementacji wzorzec projektowy, który zamienia jakąś abstrakcję w inną abstrakcję, której potrzebujemy. Np. konwersja kwadrata na prostokąt -> Square -> IRectangle. Można natomiast skomplikować ten wzorzec przez dodanie funkcjonalności Cache (np. wykorzystując jakieś Dictionary<int, TClass>, które jako klucz zawiera unikalny hash obiektu przekazanego do adaptera. Hash można pozyskać przeciążając metodę GetHashCode (Z ReSharper'em można użyć Alt+Insert (Generating members) a następnie wybrać opcję equality members. To Stworzy nam metodę GetHashCode zwracającą unikalny hash. Przy konwersji wartości możemy najpierw sprawdzić, czy były już wcześniej konwertowane przeszukując cache przy pomocy hash'a. Jeśli znajdziemy taki/e rekordy, to nie musimy ich znowu generować, tylko wystarczy je pobrać z cache.
+	W tym wzorcu można również zastosować podejście generyczne - podając jakiś potrzebny przez nas typ, do którego adapter przekonwertuje obiekt wejściowy. Jeśli potrzebujemy podać wartości stałe w dziedziczeniu przy klasach niższych, musimy to robić poprzez interfejsy, np:
+	
+	Nie możemy zrobić: 
+	MyBase<T, 1>
+		
+	Możemy natomiast zrobić:
+	public class MyBase<T, D>
+		where D : IInteger, new()
+	
+		public interface IInteger
+		{
+			int Value { get; }
+		}
+		
+		public class One : IInteger
+		{
+			public Value => 1;
+		}
+		
+		a następnie możemy po niej dziedziczyć, precyzując drugi typ generyczny: public class MyClass : MyBase<MyClass2, One>
+		
+		W taki sposób możemy uzyskać dostęp w tej klasie do wartości "1", którą przekazuje nap klasa One w polu Value.
+		
+		-Możemy również przeciążyć operatory, np "+", ale wymaga to zastosowania klas przejściowych (precyzujących oczekiwany typ), ponieważ nie możemy przeciążać operatorów na niekreślonym typie "T".
+		
+		public class MyClassOfFloat<D> : MyBase<float, D>
+		{
+			public static operator+
+			(MyClassOfFloat<D> lhs, MyClassOfFloat<D> rhs)
+			{
+				var result  = new MyClassOfFloat<D>();
+				result.Something = lhs.Something = rhs.Something;
+				return result;
+			}
+		}
+		
+		-Aby uniknąć powtarzakących się konstruktorów z parametrami, możemy stworzyć fabrykę (patrz wczęsniejszy wzorzec), która będzie pobierałą parametry takie jak w konstruktorze, ale aby zwracała poprawny typ (najniżej dziedziczony) należy zrobić tzw. Fluent Factory (patrz wcześniej).
+				
+		Bridge:
+		Jest wzorzec, który pozwala zmniejszyć złożoność, jeśli chodzi o dziedziczenie. Załóżmy, że mamy klasy:
+		Shape
+			Triangle : Shape
+			Rectangle : Shape
+				RasterTriangle : Triangle
+					RenderTriangleAsRaster();
+				VectorTriangle : Triangle
+					RenderTriangleAsVector();
+				RasterRectangle : Rectangle
+					RenderRectangleAsRaster();
+				VectorRectangle : Rectangle
+					RenderRectangleAsVector();
+		
+		Mamy 2 kształty wyświetlanie na 2 sposoby każdy. Widać tutaj potęgowe narastanie ilości dziedziczeń. Aby temu zapobiec można zamiast dziedziczenia zastosować agregację. Któraś abstrakcja powinna wtedy zawierać konstruktor, który będziemy wykorzystywać w Dependency Injection. Polega to na tym, że zamiast implementacji opcji (renderowania w tym przypadku) w kolejnej klasie w hierarchii dziedziczenia - tworzymy abstrakcję, która wpływa na renderowanie (oraz jej implementacje). Następnie przekazujemy te klasy do konstruktora głównej klasy, która je używa.
+		
+		Nowa hierarchia:
+		Shape (zawiera konstruktor z parametrem IRenderer oraz używa tego renderera w metodzie Render<Name>As<RenderType>)
+			Triangle : Shape
+			Rectangle : Shape
+	
+		Composite:
+		Jest to wzorzec, który pozwala traktować pojedyncze obiekty jak kolekcje. Dzięki temu metody operujące wyłączenie na kolekcjach działają również dla tych pojedynczych, przez co jest mniej wymaganych metod. Aby pojedynczy obiekt był traktowany jak kolekcja musi implementować interfejs jakiejś kolekcji, np. IEnumerable<T>. Wymaga to zaimplementowania brakujących metod, jednakże w przypadku pojedynczego obiektu nie mamy więcej elementów niż on sam, a zatem implementujemy metodę GetEnumerator tak, aby zwracała tylko ten obiekt:
+		
+		public class SingleValue : IEnumerable<int>
+		{
+			public int Value;
+
+			public SingleValue()
+			{
+			
+			}
+			
+			public SingleValue(int value)
+			{
+				Value = value;
+			}
+			
+			public IEnumerator<int> GetEnumerator()
+			{
+				yield return Value;
+			}
+
+			IEnumerator IEnumerable.GetEnumerator()
+			{
+				return GetEnumerator();
+			}
+		}
+
+		Decorator:
+		Jest to wzorzec, który pozwala na roszerzenie funkcjonalności klasy, po której nie można dziedziczyć (sealed class), a także pozwala na wielokrotne dziedziczenie przy pomocy interfejsów. Polega na tym, że zamiast dziedziczyć po jakiejś klasie, umieszczamy jej zainicjalizowaną instancję w obrębie naszej klasy, a następnie oddelegowujemy funkcje naszej klasy do wywołań metod tej podrzędnej klasy, Dodatkowo możemy umieścic dodatkowe metody w naszej klasie rozszerzając wspomniane funkcjonalności.
+		Decorator może, ale nie musi replikować działania obiektu dekorowanego (np. może dekorować tylko wybrane metody obiektu podrzędnego). Decorator'a nie można rzutować na dekorowany obiekt, ponieważ nie ma tutaj dziedziczenia. ReSharper pomaga w dekorowaniu obiektów przy pomocy opcji "Generating Members" (Alt+Insert) - opcja ta generuje oddelegowane metody do metod obiektu podrzędnego. Ogólnie decorator zawiera referencję do obiekut podrzędnego. Można ją zainicjalizować w konstruktorze poprzez przekazany parametr, lub zainicjalizować bezpośrednio w klasie. W C# jest możliwe statycznie tworzenie dekoratora (bez przekazywania referencji jako parametru w konstruktorze poprzez argumenty generyczne klasy - np. X<Y<Foo>>), lecz nie jest on zalecany, gdyż powoduje problemy w tym języku. Decorator dynamiczny natomiast pobiera referencję przez konstruktor.
+		
+		Przykład dynamicznego decorator'a:
+		
+		public interface IShape
+		{
+			string AsString();
+		}
+		
+		public class Circle : IShape 
+		{
+			private int radius;
+			
+			public Circle(int radius)
+			{
+				this.radius = radius;
+			}
+			
+			public string AsString()
+			{
+				return $"A circle with radius {radius}";
+			}
+		}
+		
+		public class Rectangle : IShape 
+		{
+			private float side;
+			
+			public Circle(float side)
+			{
+				this.side = side;
+			}
+			
+			public string AsString()
+			{
+				return $"A rectangle with side {side}";
+			}
+		}
+		
+		public class ColoredShape : IShape
+		{
+			private string color;
+			private Shape shape;
+			
+			public ColoredShape(Shape shape, string color)
+			{
+				this.shape = shape;
+				this.color = color;
+			}
+			
+			public string AsString()
+			{
+				return $"{_shape.AsString()} has color {color}"
+			}
+		}
+		
+		Przykład użycia:
+		
+		int Main()
+		{
+			var rect = new Rectangle(5.0f);
+			Console.WriteLine(rect.AsString());
+		
+			var circle = new Circle(2);
+			Console.WriteLine(circle.AsString());
+			
+			var cs = new ColoredShape(rect, "red");
+			Console.WriteLine(cs.AsString());
+		}
+	
+		Facade:
+		Jest to wzorzec polegający na stworzeniu API dla użytkowników, które jest prostsze w obsłudze niż klasy wewnętrzne. Użytkownicy mogą chcieć skorzystać z bardziej zaawansowanych elementów wewnętrznych, przez co w API można udostępnić więcej elementów wewnętrznych niekoniecznie prostych w obsłudze, ale dających większą kontrolę.
+		
+		Flyweight:
+		Jest to wzorzec skupiający się na optymalizacji/oszczędzaniu pamięci. Polega to na tym, że jeśli mamy jakieś powszechne, powtarzające się dane, jak np. imiona czy nazwiska w bazie danych, to te dane zapisujemy tylko w jednym miejscu, a następnie odwołujemy się do nich. Innym przykładem jest formatowanie tekstu. Zamiast zapisywać formatowanie dla każdej litery możemy stworzyć dodatkową listę obiektów (KLASY ZEWNĘTRZNEJ) z zapisanymi zakresami i formatowaniem dla tych zakresów. W takim przypadku formatując tekst nie utrzymujemy informacji o każdym znaku, tylko sprawdzamy, czy dany znak znajduje się w jakimś zakresie formatowania i na tej podstawie aplikujemy formatowanie.
+		
+		Proxy:
+		Jest to wzorzec polegający na rozszerzeniu funkcjonalności pewnej klasy poprzez interfejs, któy ta klasa implementuje podobnie jak Decorator. Proxy od Decoratora rózni się tym, że Proxy nie dodaje żadnych nowych funkcjonalności/metod, a modyfikuje wyłącznie metody z zaimplementowanego interfejsu.
+			Protection:
+			Protection proxy służy modyfikacji metod w taki sposób, że najpierw sprawdza czy użytkownik (caller) ma prawo do wywołania tejże metody.
+			
+			Przykład:
+			Użytkownik BEZ praw admina chce usunąć bazę danych poprzez metodę. Normalnie w tym celu odwołałby się do metody Delete() znajdującej się w klasie DBHandler (implementującej interfejs IDB - zawierający metodę Delete()), która nie autoryzuje w żaden sposób użytkowników. Jednak w celu autoryzacji dostępu do metod z interfejsu IDB tworzymy klasę bazującą na wzorcu Protection Proxy oraz implementującą ten sam interfejs IDB wraz z autoryzacją. Dodatkowo możemy umieścić tutaj obiekt, który implementuje właściwe usuwanie bazy danych, tj. DBHandler oraz go użyć (zamiast implementowania tych samych rzeczy po raz drugi).
+			
+			interface IDB
+			{
+				Delete();
+			}
+			
+			class DBHandler : IDB
+			{
+				public Delete()
+				{
+					<Usuwanie bazy danych>
+				}
+			}
+			
+			class User
+			{
+				public string Role {get; set;}
+				
+				public User(string role)
+				{
+					Role = role;
+				}
+			}
+			
+			class ProtectedDBHandler : IDB
+			{
+				private DBHandler dbh = new DBHandler();
+				private User _user;
+				
+				public ProtectedDBHandler(User user)
+				{
+					_user = user;
+				}
+				
+				public Delete()
+				{
+					if(_user.Role == "Admin") // Jakaś autoryzacja - tu przykładowa
+					{
+						dbh.Delete();
+					}
+					else
+					{
+						Console.WriteLine("No permission");
+					}
+				}
+			}
+			 
+			int Main(...)
+			{
+				User u = new User("Worker");
+				ProtectedDBHandler pdbh = new ProtectedDBHandler(u);
+				pdbh.Delete(); // Should write "No permission", as it is not an Admin
+			}
+			
+			Property:
+			Property proxy służy rozwiązaniu takiego problemu, że jeżeli chcemy użyć typu referencyjnego (klasy) jako właściwości (property), to Setter nie będzie zmieniać wartości w tym obiekcie, a będzie go tworzyć od nowa z nowo podaną wartością (stworzy nowy obiekt i podmieni go ze starym). Aby tego uniknąc stosujemy ten wzorzec, który polega na obudowaniu klasy referencyjnej jakąś abstrakcją (np. Property<T>, gdzie T to nasza klasa referencyjna). Property będzie miało getter i setter, które właściwie będą podmieniać wartości tej klasy referencyjnej, zamiast tworzyć nowy obiekt. Niedogodnością jest to, że w klasach zewnętrznych nie możemy stworzyć właściwości typu Property<T>, a właściwość typu T, której gettery i settery będą delegowane do getterów i setterów prywatnej zmiennej Property<T>.
+			
+			Value:
+			Value proxy obudowuje typy prymitywne, np. float. Robi się to w celu dodania dodatkowych funkcjonalności lub ograniczeń tylko dla tych pojedynczych prymitywnych typów. Przykładem może być stworzenie klasy "Price" obudowującej float w taki sposób, że typ ten bedzie przyjmował tylko wartości nieujemne a wypisując go jako string będziemy np. wypisywali tę wartość ze skojarzoną walutą.
+			
+			Composite SoA/AoS (Struct of Arrays/Array of Structures):
+			Ta implementacja Proxy służy optymalizacji pamięci jak i szybkości odczytu dużych zbiorów danych (np. tablic). Jeżeli mamy dużą tablicę skomplikowanych mniej lub bardziej obiektów, to taka tablica będzie zawierać kolejno wszystkie pola jednego obiektu, a następnie kolejnego. Dla procesora łatwiej wykonuje się operacje na tym samym typie danych/polu gdy znajdują się one obok siebie w pamięci (Najpierw 1 pole wszystkich obiektów kolejno w pamięci, a następnie drugie pole wszystkich obiektów itd.). W tym celu tworzy się klasy (Proxy), która posiada tablice przetrzymujące poszczególne pola. Dodatkowo przy konstruktorze pobiera wyłącznie ilość elementów (jak tablica), a następnie inicjalizuje wszystkie te tablice pól. Na tym poziomie tylko konstruktor jest publiczny, tablice są prywatne. Ta klasa zawiera również drugą wewnętrzną klasę, która jest publiczna. Klasa wewnętrzna wyłącznie odsyła poprzez referencję (słowo kluczowe ref) jako pola tej klasy podstawowej do elementów odpowiednich tablic o jakimś indeksie.
+			
+			Composite with Array-Backed properties:
+			Gdy chcemy powiązać ustawianie jednej właściwości (property) z ustawieniem wielu innych zmiennych, np. bool'i, to zamiast ustawiać je pojedynczo w setterze tej właściwości tworzymy tablicę o wielkości równej ilości tych pojedynczych zmiennych. Zawierać będzie ona wartości wszystkich pojedynczych zmiennych. Setter publicznej właściwości, np. "All" będzie iterował po całej tablicy ustawiając żądaną wartość, a jej Getter będzie zwracał true jeśli wszystkie wartości tablicy będą takie same oraz NULL jeśli któraś będzie inna. Pojedyncze zmienne będą miały nadal Gettery i Settery, ale będą one odwoływać się do tablicy poprzez powiązany index dla danej zmiennej.
+			
+			Dynamic: 
+			Jest to Proxy używające NuGet'a "ImpromptuInterface". Jest to NuGet, który pozwala obiektom klas zachowywać się tak, jak by implementowały jakiś interfejs, nie mając jednocześnie implementacji tego interfejsu. Jest to używane do delegowania metod tego interfejsu do właściwego obiektu przekazanego w konstruktorze do klasy z wzorcem Dynamic Proxy. Wzorzec ten wymaga również przeciążenia metody "TryInvokeMember", która jest wywoływana za każdym razem, gdy chcemy wywołać jakąś metodę z danego interfejsu (może klasy ogólnie?). Również ta klasa musi dziedziczyć po "DynamicObject". Zastosowanie tego interfejsu pomaga przechwycić wywołania metod (w Runtime) interfejsu na właściwym obiekcie, który rzeczywiście implementuje ten interfejs - z dodatkową funkcjonalnością napisaną w naszej klasie Dynamic Proxy (w metodzie TryInvokeMember).
+			
+		Chain of Responsibility:
+		Jest to wzorzec polegający na tym, że jeden element (referencja do obiektu) z tytułowego łańcucha ma odwołanie do kolejnego elementu. Dzięki temu możemy wywoływać metody, odczytywać ich parametry lub modyfikować co raz to kolejne obiekty. Innym sposobem jest zaimplementowanie centralnej listy zawierającej referencje do wszystkich obiektów. W tym przepadku (Mediator design pattern) klasa zawierająca centralną listę wykonuje bezpośrednio akcje na referencyjnych obiektach w liście. Same obiekty nie wiedzą nic o sobie, ale mogą oddelegować odpowiednią akcję do klasy centralnej (Mediatora), aby odczytać lub zmodyfikować inne powiązane obiekty. Referencje do obiektów można w łatwy sposób usunąć z łańcucha poprzez zaimplementowanie np. interfejsu IDisposable i wykorzystanie metody Dispose().
+		
+		Command:
+		Jest to wzorzec, który polega na zapisaniu danych/detali na temat określonej akcji w osobnej klasie. Zalety: obiekt można zserializować, zapisać w pamięci, zapisać na dysku, taka operacja jest łatwiejsza w obsłudze, a także pozwala to na odwrócenie operacji, ponieważ jeśli jesteśmy w stanie ją zapisać, to możemy utworzyć historię operacji. W tej klasie komendy musimy dodać referencję do obiektu, na którym będziemy wykonywać operacje. W tej samej klasie lub innej musimy zaimplementować instrukcje korzystające z danych wewnątrz komendy. Opcjonalnie możemy zaimplementować odwracającą jej działanie (np. metoda Undo()). Możemy też stworzyć tzw. Composite Command, która jest zestawem komend i nazywana jest potocznie makrem.
+		
+		Interpreter:
+		Jest to wzorzec, który polega na interpretacji danych w określony sposób. Dzieje się to w 2 etapach: Lexing i Parsing. Etap Lexing polega na zamianie znaków danych na tzw. Tokeny, czyli obiekty klasy, które mają jakieś znaczenie. Drugi etap - Parsing polega na przejściu po tych Tokenach i przetworzeniu ich w odpowiedni sposób.
+		
+		Iterator:
+		Jest to wzorzec, który określa jak użytkownik może trawersować/przechodzić po obiekcie, np. PreOrder, InOrder, PostOrder. Obiekt Iterator nie może być używany rekursywnie, ponieważ jest to maszyna stanów, która posiada pole "Current" oraz metodę "MoveNext", po wywołaniu której zmienia się Current w jakiś określony przez algorytm sposób. Generalnie C# zawiera klasę IEnumerable<T>, a w niej również metody dla odpowiednich typów trawersowania. Iterowanie działa poprzez tzw. "duck typing". Klasa nie musi implementować interfejsu IEnumerable, aby być trawersowana. Duck typing pozwala na pominięcie tej implementacji. Wystarczy, że iterowalna klasa będzie posiadać pole "Current" oraz "MoveNext" wspomniane wcześniej. Dzięki temu np. będziemy mogli użyć na tej klasie pętli foreach.
+			
+		Mediator:
+		Jest to wzorzec, który polega na tym, że istnieje jakiś Mediator, czyli obiekt, do którego cała reszta obiektów posiada referencję. Referencję do mediatora można uzyskać poprzez dependency injection (no. poprzez konstruktor). Mediator często jest Singleton'em, ponieważ nie ma potrzeby posiadania więcej niż jednego mediatora. Mediator służy do przekazywania danych między obiektami do których ma referencje. Posiada on metody, które mogą zostać wywołane przez resztę obiektów ale także te obiekty posiadają metody, które mogą zostać wywołane przez samego mediatora (np. metoda Notify). Mediatora używamy np. w przetwarzaniu Eventów, np. w bibliotece Rx (Reactive extensions).
+		
+		Memento:
+		Jest to wzorzec, który pozwala na cofnięcie systemu do poprzedniego określonego stanu (zapisanym w Memento). Memento jest to prosty token/obiekt klasy najczęściej bez żadnych metod. Posiada natomiast stan obkietu, który ma zapamiętać określony przez pola (tylko do odczytu). Memento niekoniecznie musi eksponować stan w sposób bezpośredni (ukazując wszystkie zmienne stanu), chociaż w C# jest to kłopotliwe. Memento pattern może być użyty z Undo/Redo tak jak wzorzec Command. Wystarczy przechowywać historię stanów, np. w liście oraz index aktualnego stanu. Undo/Redo po prostu przechodzą po historii zmieniając odpowiednio aktualny index stanu, a następnie aplikują zmiany zgodnie ze stanem, do którego przeszły.
+
+		Null Object:
+		Jest to wzorzec, który polega na tym, że jeśli konstrukcja obiektu jakiejś klasy wymaga dependency injection, to możemy stworzyć tzw. Null Object, aby przekazać go zamiast normalnego obiektu/zależności. Generalnie klasa implementująca wzorzec Null Object musi implementować ten sam interfejs, co zwykłe Dependency. Następnie należy zaimplementować wszystkie metody interfejsu, które najczęściej będą puste. Jeśli metoda zwraca jakąś wartość, to można tu zwrócić default(TType). Jeśli interfejs wymusza zaimplementowanie pól, to niestety trzeba je zaimplementować tak, aby mimikowały zachowanie normalnego obiektu (tak jak Mock'i). Po stworzeniu takiej klasy Null Object możemy stworzyć określony obiekt przekazując Null Object w konstruktorze. Istnieje możliwość dynamicznego tworzenia obiektów o tym wzorcu przy pomocy NuGet'a ImpromptuInterface. Taki dynamiczny obiekt przyjmuje interfejs jako argument Template, zachowuje się jak ten interfejs, a także może zwracać statycznie instancję tej klasy (ma konstruktor domyślny). Dodatkowo trzeba w jego klasie trzeba przeciążyć metodę TryInvokeMember tak, aby nic nie robiła, zwracałą true a do result wstawiała "Activator.CreateInstance(binder.ReturnType);".
+		
+		Observer:
+		Jest to wzorzec, który pozwala na obserwowanie określonych zmiennych oraz pól (również list). W C# można to zaimplementować przy pomocy eventów, obserwowalnych kolekcji (WPF-ObservableCollection, WinForms-BindingList) lub interfejsów IObserver<T>/IOBservable<T> (używane również w reactive extensions). Wzorzec Observer pozwala innym obiektom reagować na zmiany parametrów obiektu obserwowanego.
+		
+		State:
+		Jest to wzorzec, który polega na zdefiniowaniu stanów oraz Trigger'ów, które spowodują przejście do określonego stanu z aktualnego. Pomocna jest tu biblioteka (NuGet) "stateless". Przy przejściach między stanami możemy zawrzeć tzw. Guard Condition, czyli dodatkowy warunek przejścia do danego stanu. Można również określić domyślne przejście, jeśli nie jest ono zdefiniowane w kodzie.
+		
+		Strategy:
+		Jest to wzorzec, który polega na zmianie sposobu działania algorytmu (high level) w zależności od podanej strategii (implementacji interfejsu). Mamy jakiś interfejs z określoną metodą potrzebną w naszym algorytmie, lecz sposób działania tej metody zależy od implementacji tego interfejsu. Implementacja interfejsu może być przekazana statycznie poprzez konstruktor czy Template Argument (klasy) lub zmieniona dynamicznie poprzez metodę klasy, która używa tej strategii.
+		
+		Template Method:
+		Jest to wzorzec działający na takiej samej zasadzie, co Strategy, ale poprzez dziedziczenie. Polega to na tym, że mamy jakiś algorytm, który ma specyficzne części. Sam algorytm jest klasa abstrakcyjną, a metody, które mają być specyficzne dla danego przypadku są oznaczone jako abstrakcyjne, co wymusza ich zdefiniowanie w klasach niższych (dziedziczących). Wywołanie algorytmu uruchamia metody klasy bazowej, ale te specyficzne metody są wywoływane z klas niższych.
+		
+		Visitor:
+		Jest to wzorzec, który pozwala dodać metody do każdej klasy z drzewa dziedziczenia (specyficznie dla każdej z nich - nie dla klasy bazowej) bez modyfikacji tych klas. Pozwala to również na dostęp do wewnętrznych pól danej klasy. Polega na tym, że klasa, którą chcemy "odwiedzić" musi implementować metodę Accept(Visitor v) (nazwa dowolna), która po prostu wywołuje "v.Visit(this)". Jest to tzw. Double Dispatch. Pozwala nam on na wywołanie metody Visit, z określonym typem niższego poziomu w drzewie dziedziczenia. Dzięki temu niezależnie od specyficznej klasy Visitor posiada metody dla każdej z nich i jest w stanie je obsłużyć. W klasycznym Visitorze istnieje przeciążona metoda Visit dla każdej specyficznej klasy w drzewie dziedziczenia. 
+		
+		Istnieje również możliwość zaimplementowania dynamicznego Visitora. Polega na tym, że w metodzie Accept(Visitor v) uruchamiamy Visit z parametrem rzutowanym dynamicznie: "v.Visit((dynamic)this)". Dzięki temu Visitory nie muszą koniecznie implementować metody Visit dla każdej klasy w drzewie dziedziczenia, ponieważ rzutowanie na dynamic wyszukuje w Runtime odpowiednią metodę dla specyficznej klasy. Problemem jest to, że jeżeli Visitor którego użyliśmy do odwiedzenia klasy nie posiada metody dla tej specyficznej klasy, to program wyrzuci BinderException, ponieważ nie może znaleźć odpowiedniej metody. Drugim problemem jest spadek wydajności.
+		
+		Inna możliwość to zaimplementowanie Visitora z generycznym interfejsem IVisitor<TVisitable>. Dzięki temu w metodzie Accept możemy sprawdzić, czy używany przez nas Visitor obsługuje aktualną specyficzną klasę, i tylko w takim przypadku wywołać na nim metodę v.Visit(this). Dzięki temu nie mamy błędów Bindera w runtime, i nie używamy rzutowania dynamicznego. Nadal występuje tu zmniejszenie wydajności, ponieważ musimy sprawdzić typ Visitora.
+		Przykład:
+		
+		public interface IVisitor<TVisitable> 
+		{
+			void Visit(TVisitable obj);
+		}
+		
+		public interface IVisitor 
+		{
+		}
+	
+		public abstract class Expression
+		{
+			public virtual void Accept(IVisitor visitor)
+			{
+				if (visitor is IVisitor<Expression> typed)
+					typed.Visit(this);
+			}
+		}
+	
+		public abstract class DoubleExpression : Expression
+		{
+			[...]
+		
+			public override void Accept(IVisitor visitor)
+			{
+				if (visitor is IVisitor<DoubleExpression> typed)
+					typed.Visit(this);
+			}
+		}
